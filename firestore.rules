@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isOwnerOrPublic(userId) {
+      return isOwner(userId) || resource.data.status == 'active';
+    }
+    
+    // Profiles collection
+    match /profiles/{profileId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Exchange requests collection
+    match /exchangeRequests/{requestId} {
+      allow read: if isOwnerOrPublic(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // Matches collection
+    match /matches/{matchId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.requesterId || 
+         request.auth.uid == resource.data.responderId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.requesterId;
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.requesterId || 
+         request.auth.uid == resource.data.responderId);
+    }
+    
+    // Messages collection
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && 
+        exists(/databases/$(database)/documents/matches/$(resource.data.matchId)) &&
+        (get(/databases/$(database)/documents/matches/$(resource.data.matchId)).data.requesterId == request.auth.uid ||
+         get(/databases/$(database)/documents/matches/$(resource.data.matchId)).data.responderId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.senderId &&
+        exists(/databases/$(database)/documents/matches/$(request.resource.data.matchId)) &&
+        (get(/databases/$(database)/documents/matches/$(request.resource.data.matchId)).data.requesterId == request.auth.uid ||
+         get(/databases/$(database)/documents/matches/$(request.resource.data.matchId)).data.responderId == request.auth.uid);
+    }
+    
+    // Transactions collection
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.cashProviderId || 
+         request.auth.uid == resource.data.upiProviderId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.cashProviderId || 
+         request.auth.uid == resource.data.upiProviderId);
+    }
+    
+    // Ratings collection
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.raterId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.raterId;
+    }
+    
+    // Trust score history collection
+    match /trustScoreHistory/{historyId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
+    
+    // Verification documents collection
+    match /verificationDocuments/{docId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isOwner(resource.data.userId);
+    }
+    
+    // Campus locations collection (public read)
+    match /campusLocations/{locationId} {
+      allow read: if true;
+      allow write: if false; // Only admins can write
+    }
+    
+    // Presence collection for online status
+    match /presence/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+  }
+}
