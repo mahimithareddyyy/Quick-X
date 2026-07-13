@@ -47,9 +47,9 @@ User Authentication
 
 👨‍💻 Author
 
-**Venkata Sai**
+**N.Mahimitha Reddy**
 
-Feel free to connect and provide feedback or suggestions.
+Passionate about building scalable, user-centric applications and solving real-world problems through technology.
 
 
 ⭐ Support
